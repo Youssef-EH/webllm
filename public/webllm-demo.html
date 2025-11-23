@@ -4,98 +4,7 @@
     <meta charset="UTF-8" />
     <title>WebLLM chatdemo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <style>
-      body {
-        font-family: system-ui, sans-serif;
-        margin: 12px;
-        line-height: 1.4;
-        background: #020617;
-        color: #e5e7eb;
-      }
-      h3 {
-        margin-top: 0;
-        margin-bottom: 4px;
-      }
-      #status {
-        font-size: 0.9rem;
-        color: #e5e7eb;
-        margin-bottom: 8px;
-      }
-      .chat {
-        border: 1px solid #1f2937;
-        border-radius: 10px;
-        padding: 10px;
-        height: 260px;
-        overflow-y: auto;
-        background: #020617;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .msg-row {
-        display: flex;
-        width: 100%;
-      }
-      .msg {
-        max-width: 80%;
-        padding: 8px 11px;
-        border-radius: 12px;
-        font-size: 0.9rem;
-        word-wrap: break-word;
-        white-space: pre-wrap;
-      }
-      .msg.user {
-        margin-left: auto;
-        background: #0f172a;
-        border-bottom-right-radius: 2px;
-        text-align: right;
-      }
-      .msg.bot {
-        margin-right: auto;
-        background: #111827;
-        border-bottom-left-radius: 2px;
-      }
-      .row {
-        display: flex;
-        gap: 8px;
-        margin-top: 10px;
-      }
-      input {
-        flex: 1;
-        padding: 10px;
-        border-radius: 10px;
-        border: 1px solid #334155;
-        background: #0f172a;
-        color: #e5e7eb;
-        box-sizing: border-box;
-      }
-      input::placeholder {
-        color: #64748b;
-      }
-      button {
-        padding: 8px 14px;
-        border-radius: 10px;
-        border: 1px solid #334155;
-        background: #1e293b;
-        color: #e5e7eb;
-        cursor: pointer;
-        transition: background 0.12s ease, transform 0.12s ease;
-        white-space: nowrap;
-      }
-      button:hover:not(:disabled) {
-        background: #334155;
-        transform: translateY(-1px);
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      .hint {
-        font-size: 0.8rem;
-        color: #94a3b8;
-        margin-top: 6px;
-      }
-    </style>
+    <link rel="stylesheet" href="/webllm-demo.css" />
   </head>
   <body>
     <h3>Lokale LLM via WebGPU</h3>
@@ -112,10 +21,10 @@
     </div>
 
     <p class="hint">
-      Deze demo gebruikt een klein instructiemodel
-      (<code>LaMini-Flan-T5-77M</code>) via Transformers.js. De generatie
-      gebeurt volledig in je browser (Edge&nbsp;AI). Druk op Enter om je vraag
-      te verzenden.
+      Deze demo gebruikt een compact chatmodel (<code>Qwen1.5-0.5B-Chat</code>)
+      via Transformers.js. De eerste keer moet het model via internet gedownload
+      worden, maar de generatie gebeurt daarna volledig in je browser
+      (Edge&nbsp;AI). Druk op Enter om je vraag te verzenden.
     </p>
 
     <script type="module">
@@ -124,8 +33,8 @@
         env,
       } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js'
 
-      // Cache uit om oude corrupte bestanden te vermijden
-      env.useBrowserCache = false
+      // Cache mag NU wél aan – handig voor heropenen zonder opnieuw te downloaden
+      env.useBrowserCache = true
       env.allowLocalModels = false
       env.allowRemoteModels = true
 
@@ -147,9 +56,32 @@
         chatEl.scrollTop = chatEl.scrollHeight
       }
 
+      // Typing indicator (spinner met 3 puntjes)
+      let typingRow = null
+      function showTyping() {
+        if (typingRow) return
+        typingRow = document.createElement('div')
+        typingRow.className = 'msg-row'
+
+        const bubble = document.createElement('div')
+        bubble.className = 'msg bot typing'
+        bubble.innerHTML =
+          '<span class="dot"></span><span class="dot"></span><span class="dot"></span>'
+
+        typingRow.appendChild(bubble)
+        chatEl.appendChild(typingRow)
+        chatEl.scrollTop = chatEl.scrollHeight
+      }
+
+      function hideTyping() {
+        if (!typingRow) return
+        chatEl.removeChild(typingRow)
+        typingRow = null
+      }
+
       let generator = null
 
-      // Model laden (instruction-tuned text2text model)
+      // Model laden (Qwen chatmodel)
       ;(async () => {
         try {
           statusEl.textContent =
@@ -158,7 +90,7 @@
           generator = await pipeline(
             'text-generation',
             'Xenova/Qwen1.5-0.5B-Chat',
-            { device: 'webgpu' } // als WebGPU niet beschikbaar is, valt hij terug op WASM/CPU
+            { device: 'webgpu' } // valt terug op WASM/CPU als WebGPU niet kan
           )
 
           statusEl.textContent =
@@ -173,16 +105,13 @@
       })()
 
       async function runGeneration() {
-        const promptEl = document.getElementById('prompt')
         const userText = promptEl.value.trim()
         if (!userText) return
 
+        // User-bubbel komt meteen in beeld
         addMessage(userText, 'user')
         promptEl.value = ''
         promptEl.focus()
-
-        const statusEl = document.getElementById('status')
-        const goBtn = document.getElementById('go')
 
         if (!generator) {
           addMessage(
@@ -194,8 +123,9 @@
 
         goBtn.disabled = true
         statusEl.textContent = 'Status: bezig met genereren…'
+        showTyping()
 
-        // Chat template volgens de officiële Qwen-voorbeelden
+        // Chat template voor Qwen
         const messages = [
           { role: 'system', content: 'You are a helpful assistant.' },
           { role: 'user', content: userText },
@@ -208,16 +138,18 @@
 
         try {
           const output = await generator(chatText, {
-            max_new_tokens: 128,
+            max_new_tokens: 160,
             do_sample: true,
             temperature: 0.7,
             return_full_text: false,
           })
 
           const answer = (output[0]?.generated_text || '').trim()
+          hideTyping()
           addMessage(answer || '[Geen zinvol antwoord]', 'bot')
         } catch (err) {
           console.error(err)
+          hideTyping()
           addMessage('Fout tijdens generatie: ' + err.message, 'bot')
         } finally {
           goBtn.disabled = false
