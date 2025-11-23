@@ -31,10 +31,6 @@ function App() {
             draait in de browser via <strong>WebGPU</strong>. Er komt geen cloud-API
             of backend aan te pas.
           </p>
-          <p style={{ fontSize: "0.9rem", color: "#94a3b8", marginTop: "10px" }}>
-            Tip tijdens de presentatie: open DevTools &gt; <em>Network</em> om te
-            tonen dat er geen externe requests vertrekken tijdens de generatie.
-          </p>
         </header>
 
         <section style={{ marginBottom: "16px" }}>

@@ -2,40 +2,72 @@
 <html lang="nl">
   <head>
     <meta charset="UTF-8" />
-    <title>WebLLM browser demo</title>
+    <title>WebLLM chatdemo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       body {
         font-family: system-ui, sans-serif;
         margin: 12px;
         line-height: 1.4;
-        background: #020617; /* heel donker */
+        background: #020617;
         color: #e5e7eb;
+      }
+      h3 {
+        margin-top: 0;
+        margin-bottom: 4px;
       }
       #status {
         font-size: 0.9rem;
         color: #e5e7eb;
         margin-bottom: 8px;
       }
-      #log {
+      .chat {
         border: 1px solid #1f2937;
         border-radius: 10px;
         padding: 10px;
-        height: 240px; /* wat hoger */
-        overflow: auto;
-        white-space: pre-wrap;
-        font-size: 0.9rem;
+        height: 260px;
+        overflow-y: auto;
         background: #020617;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .msg-row {
+        display: flex;
+        width: 100%;
+      }
+      .msg {
+        max-width: 80%;
+        padding: 8px 11px;
+        border-radius: 12px;
+        font-size: 0.9rem;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+      }
+      .msg.user {
+        margin-left: auto;
+        background: #0f172a;
+        border-bottom-right-radius: 2px;
+        text-align: right;
+      }
+      .msg.bot {
+        margin-right: auto;
+        background: #111827;
+        border-bottom-left-radius: 2px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
       }
       input {
-        width: 100%;
+        flex: 1;
         padding: 10px;
-        margin: 8px 0;
         border-radius: 10px;
         border: 1px solid #334155;
-        box-sizing: border-box;
         background: #0f172a;
         color: #e5e7eb;
+        box-sizing: border-box;
       }
       input::placeholder {
         color: #64748b;
@@ -48,6 +80,7 @@
         color: #e5e7eb;
         cursor: pointer;
         transition: background 0.12s ease, transform 0.12s ease;
+        white-space: nowrap;
       }
       button:hover:not(:disabled) {
         background: #334155;
@@ -57,55 +90,76 @@
         opacity: 0.5;
         cursor: not-allowed;
       }
+      .hint {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        margin-top: 6px;
+      }
     </style>
   </head>
   <body>
     <h3>Lokale LLM via WebGPU</h3>
-    <div id="status">Status: model initialiseren…</div>
-    <div id="log"></div>
+    <div id="status">Status: model laden (eerste keer kan 20–40s duren)…</div>
 
-    <label for="prompt" style="font-size: 0.9rem">
-      Voorbeeldprompt (probeer bv. “Leg in 1 zin uit wat Edge AI is.”)
-    </label>
-    <input id="prompt" placeholder="Typ je vraag hier..." />
-    <button id="go" disabled>Genereer antwoord</button>
+    <div id="chat" class="chat"></div>
 
-    <p style="font-size: 0.8rem; color: #777">
-      Deze demo gebruikt een klein model (<code>distilgpt2</code>) via
-      Transformers.js. De generatie gebeurt volledig in je browser.
+    <div class="row">
+      <input
+        id="prompt"
+        placeholder="Voorbeeld: Explain what Edge AI is in one sentence."
+      />
+      <button id="go" disabled>Genereer</button>
+    </div>
+
+    <p class="hint">
+      Deze demo gebruikt een klein instructiemodel
+      (<code>LaMini-Flan-T5-77M</code>) via Transformers.js. De generatie
+      gebeurt volledig in je browser (Edge&nbsp;AI). Druk op Enter om je vraag
+      te verzenden.
     </p>
 
-    <!-- WebLLM via Transformers.js (browser build) -->
     <script type="module">
       import {
         pipeline,
         env,
       } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js'
 
+      // Cache uit om oude corrupte bestanden te vermijden
       env.useBrowserCache = false
       env.allowLocalModels = false
       env.allowRemoteModels = true
 
       const statusEl = document.getElementById('status')
-      const logEl = document.getElementById('log')
+      const chatEl = document.getElementById('chat')
       const promptEl = document.getElementById('prompt')
       const goBtn = document.getElementById('go')
 
-      function write(msg) {
-        logEl.textContent += msg + '\n'
-        logEl.scrollTop = logEl.scrollHeight
+      function addMessage(text, who) {
+        const row = document.createElement('div')
+        row.className = 'msg-row'
+
+        const bubble = document.createElement('div')
+        bubble.className = 'msg ' + who
+        bubble.textContent = text
+
+        row.appendChild(bubble)
+        chatEl.appendChild(row)
+        chatEl.scrollTop = chatEl.scrollHeight
       }
 
       let generator = null
 
-      // Probeer het model te laden, maar vang fouten netjes op
+      // Model laden (instruction-tuned text2text model)
       ;(async () => {
         try {
           statusEl.textContent =
-            'Status: model laden (eerste keer kan 10–20s duren)…'
+            'Status: model laden (eerste keer kan 20–40s duren)…'
 
-          // Klein model → sneller laden
-          generator = await pipeline('text-generation', 'Xenova/distilgpt2')
+          generator = await pipeline(
+            'text-generation',
+            'Xenova/Qwen1.5-0.5B-Chat',
+            { device: 'webgpu' } // als WebGPU niet beschikbaar is, valt hij terug op WASM/CPU
+          )
 
           statusEl.textContent =
             'Status: klaar – model draait lokaal (WebGPU indien beschikbaar).'
@@ -114,38 +168,71 @@
           console.error(err)
           statusEl.textContent =
             'Kon het model niet laden (mogelijk geblokkeerde download of netwerkprobleem).'
-          write('Fout bij laden model: ' + err.message)
-          // knop blijft disabled, maar je hebt nu een duidelijke uitleg op het scherm
+          addMessage('Fout bij laden model: ' + err.message, 'bot')
         }
       })()
 
-      goBtn.addEventListener('click', async () => {
-        const text = promptEl.value.trim()
-        if (!text || !generator) return
+      async function runGeneration() {
+        const promptEl = document.getElementById('prompt')
+        const userText = promptEl.value.trim()
+        if (!userText) return
 
-        write('> ' + text)
+        addMessage(userText, 'user')
+        promptEl.value = ''
+        promptEl.focus()
+
+        const statusEl = document.getElementById('status')
+        const goBtn = document.getElementById('go')
+
+        if (!generator) {
+          addMessage(
+            'Model is nog aan het laden, probeer het over enkele seconden opnieuw.',
+            'bot'
+          )
+          return
+        }
+
         goBtn.disabled = true
-
         statusEl.textContent = 'Status: bezig met genereren…'
 
+        // Chat template volgens de officiële Qwen-voorbeelden
+        const messages = [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          { role: 'user', content: userText },
+        ]
+
+        const chatText = generator.tokenizer.apply_chat_template(messages, {
+          tokenize: false,
+          add_generation_prompt: true,
+        })
+
         try {
-          const result = await generator(text, {
-            max_new_tokens: 60,
-            temperature: 0.8,
+          const output = await generator(chatText, {
+            max_new_tokens: 128,
+            do_sample: true,
+            temperature: 0.7,
+            return_full_text: false,
           })
 
-          const full = result[0].generated_text
-          // Model geeft prompt + antwoord terug, dus knip de prompt eraf
-          const completion = full.slice(text.length).trim()
-
-          write('🤖 ' + (completion || '[No response]'))
+          const answer = (output[0]?.generated_text || '').trim()
+          addMessage(answer || '[Geen zinvol antwoord]', 'bot')
         } catch (err) {
           console.error(err)
-          write('Fout tijdens generatie: ' + err.message)
+          addMessage('Fout tijdens generatie: ' + err.message, 'bot')
         } finally {
           goBtn.disabled = false
           statusEl.textContent =
             'Status: klaar – model draait lokaal (WebGPU indien beschikbaar).'
+        }
+      }
+
+      goBtn.addEventListener('click', runGeneration)
+
+      // Enter om te verzenden (Shift+Enter voor nieuwe regel)
+      promptEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault()
+          runGeneration()
         }
       })
     </script>
