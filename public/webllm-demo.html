@@ -1,124 +1,153 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="nl">
-<head>
-  <meta charset="UTF-8" />
-  <title>WebLLM browser demo</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <head>
+    <meta charset="UTF-8" />
+    <title>WebLLM browser demo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
-    body {
-      font-family: system-ui, sans-serif;
-      margin: 12px;
-      line-height: 1.4;
-      background: #020617;      /* heel donker */
-      color: #e5e7eb;
-    }
-    #status {
-      font-size: 0.9rem;
-      color: #e5e7eb;
-      margin-bottom: 8px;
-    }
-    #log {
-      border: 1px solid #1f2937;
-      border-radius: 10px;
-      padding: 10px;
-      height: 240px;            /* wat hoger */
-      overflow: auto;
-      white-space: pre-wrap;
-      font-size: 0.9rem;
-      background: #020617;
-    }
-    input {
-      width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border-radius: 10px;
-      border: 1px solid #334155;
-      box-sizing: border-box;
-      background: #0f172a;
-      color: #e5e7eb;
-    }
-    input::placeholder {
-      color: #64748b;
-    }
-    button {
-      padding: 8px 14px;
-      border-radius: 10px;
-      border: 1px solid #334155;
-      background: #1e293b;
-      color: #e5e7eb;
-      cursor: pointer;
-      transition: background 0.12s ease, transform 0.12s ease;
-    }
-    button:hover:not(:disabled) {
-      background: #334155;
-      transform: translateY(-1px);
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  </style>
-</head>
-<body>
-  <h3>Lokale LLM via WebGPU</h3>
-  <div id="status">Status: model initialiseren…</div>
-  <div id="log"></div>
-
-  <label for="prompt" style="font-size:0.9rem;">
-    Voorbeeldprompt (probeer bv. “Leg in 1 zin uit wat Edge AI is.”)
-  </label>
-  <input id="prompt" placeholder="Typ je vraag hier..." />
-  <button id="go" disabled>Genereer antwoord</button>
-
-  <p style="font-size:0.8rem; color:#777;">
-    Deze demo gebruikt een klein model (<code>distilgpt2</code>) via Transformers.js. 
-    De generatie gebeurt volledig in je browser.
-  </p>
-
-  <!-- WebLLM via Transformers.js (browser build) -->
-  <script type="module">
-    import { pipeline } from "https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js";
-
-    const statusEl = document.getElementById("status");
-    const logEl = document.getElementById("log");
-    const promptEl = document.getElementById("prompt");
-    const goBtn = document.getElementById("go");
-
-    function write(msg) {
-      logEl.textContent += msg + "\n";
-      logEl.scrollTop = logEl.scrollHeight;
-    }
-
-    // 1) Model laden
-    statusEl.textContent = "Status: model laden (eerste keer kan 10–20s duren)…";
-
-    const generator = await pipeline(
-      "text-generation",
-      "Xenova/distilgpt2"   // kleiner = sneller laden
-    );
-
-    statusEl.textContent = "Status: klaar – model draait lokaal (WebGPU indien beschikbaar).";
-    goBtn.disabled = false;
-
-    goBtn.addEventListener("click", async () => {
-      const text = promptEl.value.trim();
-      if (!text) return;
-
-      write("> " + text);
-      goBtn.disabled = true;
-
-      try {
-        const result = await generator(text, {
-          max_new_tokens: 60,
-          temperature: 0.8
-        });
-        write(result[0].generated_text);
-      } catch (err) {
-        write("Fout: " + err.message);
-      } finally {
-        goBtn.disabled = false;
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 12px;
+        line-height: 1.4;
+        background: #020617; /* heel donker */
+        color: #e5e7eb;
       }
-    });
-  </script>
-</body>
+      #status {
+        font-size: 0.9rem;
+        color: #e5e7eb;
+        margin-bottom: 8px;
+      }
+      #log {
+        border: 1px solid #1f2937;
+        border-radius: 10px;
+        padding: 10px;
+        height: 240px; /* wat hoger */
+        overflow: auto;
+        white-space: pre-wrap;
+        font-size: 0.9rem;
+        background: #020617;
+      }
+      input {
+        width: 100%;
+        padding: 10px;
+        margin: 8px 0;
+        border-radius: 10px;
+        border: 1px solid #334155;
+        box-sizing: border-box;
+        background: #0f172a;
+        color: #e5e7eb;
+      }
+      input::placeholder {
+        color: #64748b;
+      }
+      button {
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid #334155;
+        background: #1e293b;
+        color: #e5e7eb;
+        cursor: pointer;
+        transition: background 0.12s ease, transform 0.12s ease;
+      }
+      button:hover:not(:disabled) {
+        background: #334155;
+        transform: translateY(-1px);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Lokale LLM via WebGPU</h3>
+    <div id="status">Status: model initialiseren…</div>
+    <div id="log"></div>
+
+    <label for="prompt" style="font-size: 0.9rem">
+      Voorbeeldprompt (probeer bv. “Leg in 1 zin uit wat Edge AI is.”)
+    </label>
+    <input id="prompt" placeholder="Typ je vraag hier..." />
+    <button id="go" disabled>Genereer antwoord</button>
+
+    <p style="font-size: 0.8rem; color: #777">
+      Deze demo gebruikt een klein model (<code>distilgpt2</code>) via
+      Transformers.js. De generatie gebeurt volledig in je browser.
+    </p>
+
+    <!-- WebLLM via Transformers.js (browser build) -->
+    <script type="module">
+      import {
+        pipeline,
+        env,
+      } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers/dist/transformers.min.js'
+
+      env.useBrowserCache = false
+      env.allowLocalModels = false
+      env.allowRemoteModels = true
+
+      const statusEl = document.getElementById('status')
+      const logEl = document.getElementById('log')
+      const promptEl = document.getElementById('prompt')
+      const goBtn = document.getElementById('go')
+
+      function write(msg) {
+        logEl.textContent += msg + '\n'
+        logEl.scrollTop = logEl.scrollHeight
+      }
+
+      let generator = null
+
+      // Probeer het model te laden, maar vang fouten netjes op
+      ;(async () => {
+        try {
+          statusEl.textContent =
+            'Status: model laden (eerste keer kan 10–20s duren)…'
+
+          // Klein model → sneller laden
+          generator = await pipeline('text-generation', 'Xenova/distilgpt2')
+
+          statusEl.textContent =
+            'Status: klaar – model draait lokaal (WebGPU indien beschikbaar).'
+          goBtn.disabled = false
+        } catch (err) {
+          console.error(err)
+          statusEl.textContent =
+            'Kon het model niet laden (mogelijk geblokkeerde download of netwerkprobleem).'
+          write('Fout bij laden model: ' + err.message)
+          // knop blijft disabled, maar je hebt nu een duidelijke uitleg op het scherm
+        }
+      })()
+
+      goBtn.addEventListener('click', async () => {
+        const text = promptEl.value.trim()
+        if (!text || !generator) return
+
+        write('> ' + text)
+        goBtn.disabled = true
+
+        statusEl.textContent = 'Status: bezig met genereren…'
+
+        try {
+          const result = await generator(text, {
+            max_new_tokens: 60,
+            temperature: 0.8,
+          })
+
+          const full = result[0].generated_text
+          // Model geeft prompt + antwoord terug, dus knip de prompt eraf
+          const completion = full.slice(text.length).trim()
+
+          write('🤖 ' + (completion || '[No response]'))
+        } catch (err) {
+          console.error(err)
+          write('Fout tijdens generatie: ' + err.message)
+        } finally {
+          goBtn.disabled = false
+          statusEl.textContent =
+            'Status: klaar – model draait lokaal (WebGPU indien beschikbaar).'
+        }
+      })
+    </script>
+  </body>
 </html>
